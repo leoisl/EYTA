@@ -1,0 +1,1 @@
+tools/EYTA -t ../scripts/astalavista_scripts/Homo_sapiens.GRCh38.90.chr21.gtf.shallow_transcriptome_0.1.fa -sesr sr -nb-cores 8 -min_abundance 0 -rel_cutoff 0 -max_length_intron 1000000 -max_length_as 1000000 -splicing_complexity_AS 1000000 -splicing_complexity_IR 1000000 > out_stream

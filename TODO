@@ -1,0 +1,657 @@
+TODO:
+    PRIORITY:
+        -CHECK AND TEST ULG WITH READS THAT MAP IN UNITIGS AS:
+            -FW FW
+            -FW RC
+            -RC FW
+            -RC RC
+        -ULG EDGES SHOULD BE CONFIRMED BY AT LEAST N READS TO BE CONSIDERED VALID (N=2 BY DEFAULT)
+
+        -CHECK WHY THE PERFORMANCE IS NOT GOOD (50%)
+
+
+    2. ASTALAVISTA finds bubbles between splice sites. So they know exactly where are constitutive splice sites are, whereas we don't.
+        We know only k bases in the flanking exons around an AS. So, EYTA events (bubbles) will be inside ASTALAVISTA events.
+    3. It is safe to say that some ASTALAVISTA events won't correspond to any EYTA event and vice-versa. Check how many cases we have as such and if we should try to understand them.
+    4. Simulation and benchmark:
+        4.1. Get all pairwise ASTALAVISTA events for human chr21 using ASTALAVISTA.
+            -By running ASTALAVISTA and script convert_astalavista_gtf_to_fasta.py
+            -This will be our ground truth.
+        4.2. Simulate all reads from all transcripts from chr21 (nice coverage - 20x, no sequencing errors or mutations).
+            -Later we'll add realistic expression levels, sequencing errors, SNPs, etc... with Flux simulator
+            -wgsim
+        4.3. Generate a shallow transcriptome (10% of the transcripts from each gene).
+            -Later we will vary this shallow transcriptome [1%, 5%, 10% ... 50%]
+        4.4. Run EYTA
+        4.5. Check EYTA's performance
+            -Your ground set are all the pairwise ASTALAVISTA events that contains one transcript from the shallow transcriptome and one transcript in the short reads
+                -To say that an EYTA bubble correspond to an ASTALAVISTA event, try to find the EYTA bubble inside the ASTALAVISTA event (exact match)
+                -Since the definition of an ASTALAVISTA event and an EYTA event are different, we need to do something smarter
+                    1/ Each EYTA event must map inside a single ASTALAVISTA event
+                        -If it maps to 2+, report this
+                        -If it maps to <1, report this
+                    2/ Mark all bases in all ASTALAVISTA events that are covered by EYTA events (just a boolean where it mapped)
+                    3/ After marking everything, remove all marked bases.
+                        -If the resulting two strings of ASTALAVISTA events are the same, it means EYTA found all events in that ASTALAVISTA event;
+                        -Otherwise, it failed, so you should output the events that failed
+
+
+
+TODO:
+    Absolute paths do not work in --prefix
+
+    -MULTITHREAD THE 3RD STEP
+    -finish a version for weekend for camille to test the spike-in
+        -subsampling ONT spike-in transcription
+    -ASTALAVISTA pour prendre le bulles
+    -Message principal:
+        -In RNA-seq, the long range sequencing from 3rd generation sequencers do not help us as much as in DNA-seq, because the transcripts are usually shorter
+        -And a lot of transcripts are not knowin in 3rd generation sequencing due to the depth.
+
+
+
+TODO for next week:
+Find AS events in each transcript of each gene
+    2.1. Remove only the blue-only nodes
+    2.2. Search for AS (all targets, limited path size) and for introns (limited targets, very large size)
+    2.4 Neighbour search should be RED or RED-BLUE
+    2.3 When finding a path, you only output it if it is not already contained in a transcript (use the 20% threshold difference - semi-global alignment)
+        -To find the possible transcripts you need to compare with, you can go to the *purple flanking* nodes of the path and get all the transcripts including both flanks
+        -Store, for each *purple* trustful unitig, a vector of the transcripts containing it
+            -This is doable as by kallisto - the # of unitigs in a transcriptome is not so high
+            -For now, it is easier to do this for each blue trustful unitig, thus that is what we'll do
+        -Do not worry on finding red-only or mostly red paths by now - this contraint won't increase the # of paths by much, I guess...
+
+WORST version:
+    2.5 At least x% (x=50?) of the path must be red-only
+        -This is flexible enough to allow some blue nodes in it, but also a very fast way to filter out paths that are not already in the transcripts
+        -Not really - well placed SNPs can make a path red-only, but yet very similar to a blue sequence
+
+TODO maybe for after:
+    If the performance of searching if a path is in the transcripts is slow, try to:
+        Receive as input transcripts clustered by genes - then you just need to check if the path is in the transcripts of a gene
+
+
+TREATING PE-READS IS HARD
+    -LEAVE IT TO AFTER
+    -DO NOT USE
+    -MAYBE USE IT TO FILTER OUT WHICH NODES OF THE GRAPH WE SHOULD CONSIDER!!! IDK... IT IS NOT INTUITIVE...
+
+
+LIMITATIONS:
+    -WE DO NOT MANAGE TO FIND NEW EXON COUPLINGS. FOR EXAMPLE, IF A GENE G1 HAS 2 KNOWN TRANSCRIPTS:
+    -T1: EX1 -> EX2 -> EX4 -> EX5 -> EX7
+    -T2: EX1 -> EX3 -> EX4 -> EX6 -> EX7
+    AND THERE IS A THIRD TRANSCRIPT T3 EXPRESSED IN THE SHORT READS:
+    -T3: EX1 -> EX2 -> EX4 -> EX6 -> EX7
+    WE WON'T BE ABLE TO FIND ANYTHING HERE BECAUSE ALL LOCAL EVENTS ARE DESCRIBED BY T1 AND T2.
+
+-TALK ABOUT POSSIBLE CHIMERISM IF THE HINTS ARE NOT ENOUGH
+
+-TALK MORE ABOUT THE COVERAGE PROBLEM IF THERE IS:
+EX1->EX2->EX4
+AND
+EX1->EX3->EX4
+AS REAL EVENTS, BUT THERE IS NO READ CONNECTING EX1->EX4 GOING THROUGH EX3, WE WON'T LIST EX1->EX3->EX4, BUT WE SHOULD
+
+
+SKIP DE-NOVO LR ASSEMBLY
+    -USE A REFERENCE BASED ASSEMBLY
+        -MAP THE LRS TO THE TRANSCRIPTOME
+        -GETTING THE FULL TRANSCRIPTS
+        -GET THE % OF READS MAPPING TO REFERENCE TRANSCRIPTOME WITH 80%QC
+    -WHAT THE COMMUNITY DOES WITH THIS?
+
+-USE THE NAIVE SIMULATION
+
+-1 MONTH FOR FINISHING IMPLEMENTATION + BENCHMARK ON BOTH DATASETS
+    -25/01 FOR IMPLEMENTATION
+    -+2 WEEKS FOR BENCHMARK
+        -START WITH REAL DATASET
+            -REAL DATASET BENCHMARK: BUILD BUBBLES -> K2RG APPROACH
+        -BENCHMARK WITH THE SPIKE-IN DATA TO GET THE VALIDATIONS
+            -WE HAVE SPIKING COMPLEXITY THAT ARE NOT TRIVIAL
+        -USE SIMULATED DATASET ONLY TO ADDRESS SPECIFIC QUESTIONS
+            -SIMULATE SINGLE GENES USING LONG READS AND SHORT READS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CHECK IF THERE IS A READ ALLOWING US TO SOLVE THE REPEAT!!!
+BUILD THE ULG!!!
+
+-Use superreads?
+    -Superreads are not only an extension of a read, it also minimizes errors...
+
+TODO:
+1. Proof of concept: EYTA can find all events KisSplice can find + the events that KisSplice can not systematically find: the ones traversing repeats (especially ALUs)
+    -Real dataset: Sknsh
+        -Real example: get one gene that has an exon containing an ALU that KisSplice cannot enumerate in the Sknsh paper
+
+-Filtering the graph when building AS from a gene G
+    0. For now, let's work on the ULG only
+        -since we have to find paths in the SRs, it makes sense to work only on these guys
+    1. Suppose that your starting node is x
+        1 [skip]. We first try to find an exclusion isoform starting at x. This means searching for:
+            1.1) a red-only path with size between 2k-10 and 2k (counting the first kmer (x) and the last kmer (target));
+            1.2) connecting x to any node t in a set T of targets, such that the sequence from x to t in the long reads is at least 2k+1
+        2 [skip]. We then try to find an inclusion isoform (change length of the searched path and which nodes are targets)
+
+        3. We find all paths from x to t, where t is a target downstream x in the transcript.
+            -All nodes in this paths must be mostly red (90% red) - we want stuff that are only in the short reads
+            -The paths searched must respect an upper length
+            -
+        3. Since we want to find novel AS events (not described in the transcripts of this gene), we are not allowed to traverse
+
+            -how to deal with trustful unitigs in other transcripts?
+
+
+    -Other ideas:
+        -do not assemble stuff having stop codon in-frame
+        -remove unique k-mers from other genes when processing a given gene (removing regions that we know that are not in the considered graph)
+
+-vastDB: http://vastdb.crg.eu/wiki/Gene:ENSG00000198467@Genome:hg19
+
+
+    2. To list only splice events and get rid of sequencing errors, SNPs and indels (small variations), use ULG in a way a lil bit different.
+        -When searching for a region flanked by regions in the transcriptome, find the trustfull unitigs within a distance d (d depends if you are searching for exon, introns or whatever) and try to include them in your paths;
+            -The long unitigs are trustful unitigs - we can trust they are assembled correctly and we should really use them... They are the most valuable part of the graph;
+            -These are long regins assembled from SR or SR+LR
+        -If we have a long unitig that is present in both SR+LR
+            -This means that this unitig could be well assembled from SR + it is also present in the LR!
+            -This means that this well assembled region can be trustfully assigned to the genes it is contained in!
+            -When looking for new paths inside the transcript of a gene, we should not look for the trustful unitigs that are cointained in other genes - we have a high risk to build chimeric events, and we will lose few events I guess
+        -Such unitigs must also be mostly red (80%+);
+
+
+-Benchmark
+    tem NA 12878 - junto com pacbio e illumina, vai ser um bom test!!!
+
+-To remove the memory burden, given a linear path p, we should just decorate one kmer each l kmers, so we use way less memory (original memory / l), at the cost of more processing (maybe needing to consult l kmers to check which unitig the kmer is from)
+
+
+Reference transcriptome may have transcripts that are not expressed at all
+  Refseq is way smaller than Gencode
+
+
+  guided by the full transcript
+
+  main transcript is dataset dependent
+    -it is not the longest, but the heaviest
+
+  focus on main isoform
+    -graph representation
+    -variations that break the reading frame
+
+  get examples from Clara's papers!!!
+    to show that it works
+
+  pantranscriptomics
+    population transriptomics are repsented by graphs
+
+  Friday next week - meeting
+
+  fotos do quadro
+
+
+
+
+
+Benchmark:
+-The long reads are now reliable since they are reference - they should be added to the DBG!!
+    -or maybe not - what do we gain putting the blue nodes on the graph?
+
+-EYTA should receive a reference transcriptome and SRs, and should compute the ASI (internal AS events) miseed by LR but found on SRs
+-1st benchmark:
+    -We use GRCh38.p10 human reference genome and Ensembl90 annotations
+        -We first clean the annotation just leaving the ones where we have a chromosome from GRCh38.p10
+    -We use a naive simulator to simulate an incomplete reference and comprehensive perfect short reads
+        -To simulate an incomplete reference, for each gene in Ensembl90 we say that only ceil(10%) of its transcripts are annotated
+            -We call this IncompleteEnsembl90
+            -10% is fine? More?
+            -Or get the longest transcript only?
+        -To simulate deep RNA-seq reads, all the transcripts of a gene in Ensembl90 are covered by SRs
+            -This include the transcripts that are in IncompleteEnsembl90
+        -For now, the short reads have no errors, and even coverage
+            -SRs are 101 bp in length and are spaced every 30 bps
+    -We retrieve the ground truth using ASTALAVISTA + post processing
+        -ASTALAVISTA will find all pairwise events in Ensembl90
+            -We filter out only the AS events pertinent to EYTA:
+                -Those such that one path is in IncompleteEnsembl90 and the other not (this other path will be surely on Ensembl90 and also on the short reads);
+                -We get the FASTA sequences of these events
+                    -Transform the GTF bubble into a FASTA bubble
+                    -This will be our ground truth
+    -We run EYTA giving the IncompleteEnsembl90 and the short reads
+        -EYTA will have to output bubbles such that one path is in the Reference and the other is in the short reads
+        -We check if the bubble output by EYTA correspond to one of the ground truth
+
+
+
+
+  Reference transcriptome may have transcripts that are not expressed at all
+  Refseq is way smaller than Gencode
+
+
+  guided by the full transcript
+
+  main transcript is dataset dependent
+    -it is not the longest, but the heaviest
+
+  focus on main isoform
+    -graph representation
+    -variations that break the reading frame
+
+  get examples from Clara's papers!!!
+    to show that it works
+
+  pantranscriptomics
+    population transriptomics are repsented by graphs
+
+  Friday next week - meeting
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pipeline:
+1. Build SR graph
+2. Map LR transcripts on the DBG
+3. Build the transcripts (assembly)
+4. Cluster the transcripts by gene
+5. Find the main transcript
+6. Give it all to EYTA
+
+
+-Summary:
+    -After our discussion, I worked some on this but got a lot more involved in other projects. I returned to EYTA just some 2 weeks ago.
+    -There are some things that you told me during the meeting that were not very clear to me at the moment. Now, I think they are. Sorry for the long time to really understand some stuff.
+    -I am kind of in the testing phase. However, in order to test if a tool works, we need to know exactly what we want to test, i.e. we need to know exactly what we want our tool to do, and how to measure
+if it is good or not. Unfortunately, the output of our tool is not very well defined. We know some internal processing, and what more or less we should output, but the exact object, I was not sure. Of course,
+as I am developing the tool, in fact, I have a very well defined output (otherwise the tool would not work), but I didn't find it particularly useful for the scientific community. So, after thinking about this,
+I thought that the best output we could give the user is the one proposed by Vincent:
+Input: RNA-seq LRs and SRs
+Output: For each gene G, show the main transcript MT and the variations around this Main Transcript that are expressed in the LRs and in the SRs (and maybe in both also).
+
+I think this really could have some value, and is something that people might really get interested. And it is better than our previous idea of just showing what the LRs miss.
+
+I guess Vincent was trying to say exactly this for me a long time ago, but as I was so involved with an other idea of the tool, this was making me blind.
+
+
+
+
+
+-New idea
+Hypothesis: Every gene has one major transcript, and we will describe the variations only around this major transcript using short+long reads
+    -This hypothesis is kind of ok: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4768900/
+    -We do not care anymore about variations around the minor transcripts
+        -We might lose completeness here, but these variations are probably less important (less functional impact - just a blind guess).
+        -Let's try to solve firstly the easier problem, then move to a harder one.
+    -If there are 2 or more major isoforms?
+        -For now, I don't care.
+
+
+
+
+
+-Several steps yet not addressed (all are hard task and could be a paper on themselves):
+Main Pipeline:
+    0. Error correct the LRs using SRs
+        -Outsourced: LoRDEC
+        -In a 1st step, we have transcripts (perfect full length LRs)
+    1. Cluster the LRs by gene in a de-novo way
+        -Camille's tool is already very good
+        -In a 1st step, use a perfect clustering (by mapping to the annotations)
+    2. We are given RNA-seq LRs clustered by genes, and we need to assemble each gene in a de-novo way
+        -This is already a hard task. What do we do here?
+            -Do we do a mini assembly, since RNA-seq LRs represent sometimes the full transcript?
+                -The problem is way easier than in RNA-seq, but how much easier it is, I don't know... Mb there are tools that do this already.
+            -Do we outsource this task?
+        -In a 1st step, suppose you have a set of perfect transcripts (directly from the reference) representing the transcripts expressed by the LR. We take this set (as if we had perfect LRs and a perfect assembly)
+    3. How to get the major transcript?
+        -We can use the Appris database itself to predict the main isoform
+            -Then we are like going away from the de-novo context... Is it a problem?
+        -Or we can use the Appris database to try to infer characteristics of the major isoforms
+            -Define a set of features of each major transcript (SR kmer coverage, LR coverage, length, sequence, translated sequence, contains NMD or not, etc, etc, etc) and use a ML algorithm to let it learn what is a major transcript and what it is not
+                -APPRIS use a lot more better features: functionally important residues, protein structure mapping, orthologous isoforms comparison, curated Pfam functional domains, +2...
+                    -I really do not know if our very simple measures can give us a nice classification
+            -We are hoping here that there is pattern that describes the major transcripts
+            -Still, we are using references and annotations to predict characteristics - not sure how de-novo this is
+        -I think it is safe to assume that the main transcript is covered by both LRs and SRs (and more, well covered by SRs)
+        -In a 1st step, get the major transcript from the APPRIS database (if there is none, select the longer one)
+    -----------Here we have a sample of the transcriptome (only the transcripts assembled with the LRs, which is not deep) and the major transcript------------
+    4. Find the variations between the major transcript and the non-major ones
+        -Do we do this ourselves?
+        -Do we outsource this?
+        -By mapping is probably better...
+        -Note that we have few variants here, probably, <50 - some theoretically inefficient algorithms may work
+        -In a 1st step, ignore this step
+    5. Find the variations between the major transcripts and what is in the SRs
+        -Probably the hardest and longest step to implement, but almost everything is already done!
+        -Build the DBG of the SR
+            -ok
+        -Map the major transcript to the DBG
+            -ok
+        -Find the alternative paths
+            -ok
+        -Output
+            -kind of ok
+    -----------Here we have, for each gene, the major transcript and the variations around this majro transcript------------
+    For the output, I really liked APPRIS output:
+    https://www.dropbox.com/s/7fxngpu3derech8/Screenshot%202017-09-12%2014.48.17.png?dl=0
+    We can show the variations here
+
+
+Some considerations about the pipeline:
+I have no idea how useful the tool is if we make it like this. It is useful to some extent, but I really think that annotations are far from complete, so we should not be guided by them.
+However, I really think that good genome assemblies will be easy to get with long reads. So, users of the tool will probably have DNA-seq LR, which means that they can have a good genome assembly.
+I think the best option would be to do a tool that is genome guided (not annotation guided), but then I would prefer a lot more do mapping than using DBGs.
+
+
+
+Research planning:
+    -Work on the full pipeline... or, in a short paper, we can simply finish implement step 5, do the tests and write a short paper, and then go to a big paper with all the 4 steps
+    -For RECOMB, I do not know... There is no real algorithmic contribution here... or maybe there is:
+
+A new idea for step 5 (possible algorithmic novelty):
+Work on the RBG-DBG
+    -We build a DBG for the RNA-seq SRs (required - red color), Transcriptome (required, can be reference or de-novo assembly - blue color), and genome (optional, can be reference or assembly - green color)
+
+
+
+
+
+
+
+
+*****************************************************************
+**DO NOT ADD THE REFERENCE GENOME TO THE TOOL
+**********IF YOU HAVE A REFERENCE GENOME, YOU CAN DO STUFF USING MAPPING WAY BETTER THAN BUILDING DBG
+*****************************************************************
+
+Or maybe we should consider:
+    -Low Coverage genomic Long Reads
+    -Low coverage transcriptomic long reads
+    -Deep transcriptomic short reads
+    -But then, again, with the genomic long reads, you make a reference genome, and them mapping the transcriptomic reads is the solution for the transcriptome assembly
+        -There is not even need for the transcriptomic long reads in fact here
+    -And in cancerous cells???
+
+The best scenario for us would be transcriptomic long reads + genomic long reads
+    -But here, it is hard to know why someone would do long reads RNA-seq without
+        -a reference genome or long reads DNA-seq (in the case RG is not available)
+
+
+
+
+1. Test with the perfect dataset:
+    -LRs are full transcripts, clustered by genes
+    -SRs have even depth, and no errors
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-Wait Corrine's filtering of mitochondrian and ribosomal RNA
+-Maybe I will write scripts to do this
+
+
+-check if everything is correct (dbg construction, mapping, etc)
+
+
+EYTA is a pipeline to process LR data
+1. Correct the LR (for the moment, use LoRDEC)
+2. Cluster the LRs into genes
+3. Find Alternative Paths of these LRs (i.e. sequences present in SRs, but not in LRs)
+
+
+EYTA improvement final algorithm:
+1. Get the LRs of your cluster
+2. Mark all LR nodes
+3. For each LR node:
+     3.1. Find alternative paths by leaving the LR node and going to SR ONLY nodes, until you go back to a LR node;
+          -Problem: how do I know I am going forward, and not backwards in the graph (i.e. how do I know that the source node comes before the target node if they lie in different LRs)? If the source and target lie in the same LR, then I can know. Otherwise, I cannot... I think one of the drawbacks is that you lose the total order with this graph, although you have a partial order...)
+            -This probably does not happen very often -> test in real data... If it happens, then just choose one path or both... not much to worry I guess...
+     3.2. The SR only alternative path you found must be output... However, you might lose the bubble property, since you can leave from one LR and arrive in another one, and then you cannot build the bubble!!
+        -I might or might not lose the bubble property... Try to check some examples
+MAIN PROBLEM: WHEN JUMPING FROM ONE TRANSCRIPT TO THE OTHER, YOU WONT BE ABLE TO ASSEMBLE THE LR SEQUENCE, AND THEN YOU WILL LOSE A BUNCH OF VALUABLE INFORMATION
+    -Try to assemble the LR sequence somehow
+    -Even if you lose the LR sequence, it might not be that important this information... - the important thing is to show the user what he loses with LR nodes
+
+
+4. Quantify each LR;
+5. Cluster the LRs of your gene, in such a way that each cluster represents a transcript and all reads of that transcript (you can do this by calculating all-pairs edit distance I think)
+6. Choose one representative for each cluster - this will be the read representing the transcript
+    -I think choose the most expressed transcript is a nice way to get a representative...
+7. Quantify each AS event (SR-only paths)
+8. Output, in decreasing order, the transcripts most expressed to the least expressed, and afterwards, the SR-only AS events, in decreasing order also.
+
+
+Quantification:
+    -For now, let's go for a very simple method:
+        1. The quantification is the average SR-kmer-coverage of the read (LR or SR, does not matter);
+        2. Get the SR-kmer-coverage of all nodes and sort them;
+        3. Due to repeats and high heterogeneity, I think it is nice to remove the 20% lowest and 20% highest counts;
+        4. Get an average of the remaining 60% average counts;
+
+
+
+****************************************************
+
+
+
+
+Idea 2 of trying to process the whole gene:
+1. Get the LRs of your cluster
+2. Mark all LR nodes
+3. For each LR:
+    3.1. Find alternative paths by leaving the LR node and going to SR ONLY nodes (these are the nodes that are not in ANY LR node of the cluster), until you go back to the LR;
+        *PROBLEM - you might lose some stuff here. For example:
+        LR1: Ex1 -> Ex2 -> Ex6
+        LR2: Ex1 -> Ex5 -> Ex6
+        SR: Ex1' -> Ex2 -> Ex3 -> Ex4 -> Ex5 -> Ex6'
+        You will probably lose this event because it always goes out from LR1 and arrives at LR2 or vice-versa
+    3.2. For the output, you output the LR and the alternative paths. Here, at least, you are sure that the alternative paths are only in the SRs and it is easier to BLAT, since it is only 1 LR and its alternative paths
+
+
+
+TODO:
+-EYTA does not work well with raw PacBio reads and low k-mer (e.g. 19)
+-The main problem was to find alternative paths near the poly-A tail
+  -Almost all transcripts include the poly-A tail, and thus almost all transcripts would have some kmers in common (composed of AAAAAAAAAAAAA...)
+  -if a transcript a kmer in common with another one, then this would compose a bubble, due to this common kmer and the poly-A tail of both transcripts
+  -This induces a large amount of alternative paths to find (unfeasible amount)
+-Idea to check if this is really the problem:
+  1. Remove the poly-A tails of the transcripts
+  2. Error-correct the transcripts
+  3. Run EYTA with k=31
+  4. Check the results
+
+
+Mapeamento em DBG com k grande (41)
+  -vai melhorar as coisas, mas nao vai resolver
+  -para mapear, para cada kmer pequeno (i.e. 15) do LR, pegue um conjunto de kmer grandes (i.e. 41, do DBG) que contem o kmer pequeno
+  -Com os kmer grandes, tente construir um caminho do primeiro ao ultimo kmer que mais se assemelha ao LR (menor ED possivel)
+
+Simplificacao do grafo
+  -VERIFICAR BUBBLE BURSTING - É ISSO QUE ELES FAZEM EM GENOMA, E PODE SER UTIL PRA TRANSCRIPTOMA
+    -Ver a implementaçao do SPADES, que ja ta implementando no GATB!
+  -compressao de varios caminhos com pequena ED em um unico caminho
+  -como vc busca varios caminhos similares, com pouca ED, talvez é interessante usar o branching?
+    -
+  -idea da marie em comprimir as bolhas que cujo indegree de s é 1 e o outdegree de t é 1?
+  ou melhor:
+    1. Identifique SNPs/Indels (algoritmo classico do KS (acho melhor meu alg naive), com branching e etc, mas com bolhas complexas)
+    2. Entre dois nos, escolha 1 caminho
+    3. substitua todos os caminhos por este caminho
+    4. Bubble bursting???
+
+
+
+-TODO 2:
+  -We can make as hypothesis that we DO NOT want to find small variations (which is on the sequence level) - only long ones (on the structural level)
+  -We can suppose that an exon/intron that is lost by the LR will not be fully composed by repeats - it will have a long enough unique regions
+    -Use ULG!!!
+
+
+-gotta try with a larger k with corrected reads and poly-A tail removed reads
+
+DBG/unitig construction:
+  -We should migrate to BCALM
+
+LR mapping
+  -very fast, but too memory consuming:
+    -For each kmer, we store unitig Id (32bit), pos(32 bit), strand (1 bit)
+    -How to get less memory consuming:
+      -store just the unitig Id (calculate pos and strand on the fly)
+  -BGREAT does not seem to work, since we have too many errors in LR (it is supposed to map short reads in DBG)
+    -the edges, which are used as seeds, can have errors, causing spurious mapping
+    -if you the first or last edges have errors, the read is unmapped
+    -It is ok for me if a part of the read map, and then we have a part unmapped, and so on... BGREAT does not handle this (and it should not also, since it is conceived to do another thing)
+
+How to get a faster algorithm:
+  -In a simplified way, we can think that KisSplice aims at finding all bubbles between two nodes
+    -Which can be reduced to find all paths between two nodes
+  -We can argue that this is a very hard task... It is simpler, and it would give the same structural value, if we burst out all snps/indels and find paths in this situation
+    -I mean, finding one ES event should be like finding only one path, and not 8^2 paths if we have 8 SNPs/SE in this exon
+  -If you want sequence value (and not just structural value), you should not burst out the SNPs/indels
+    -But then it is way harder to enumerate
+  -A way of burst out snps/indels is to use the Unitig Linking Graph
+    -It bursts out SNPs/indels, and use SR linking, which is pretty nice
+    -And it is also a very fast way - we can not afford to spend more than 10 seconds processing a LR...
+  -And, in the end, what we will compare is how well EYTA and KS find AS events - we do not care for sequences, but structures...
+
+
+-Comparison with KisSplice
+-Simulated tests with APPRIS database
+-Quantification
+  -correlation of the quantification of LR and SR
+-Try EYTA with genomic sequence
+-SR = quantification, sequence (ER), structure
+-LoRDEC with read quantification to EC reads
+
+Simulated dataset:
+  -Nrxn1
+  -1 read Pacbio avec le main transcript
+    -Beaucoup PAcbio reads pour chaque transcript
+  -Beaucoup Illumina reads pour chaque transcript
+  -Variants
+
+
+
+
+
+
+
+
+
+
+Other notes:
+2. What we want to do is pretty similar to what lordec does - map the LR to a DBG. However, we do not want to correct the LR, but we want to find several different paths between two nodes of the LR which can potentially be a variant only seen by the SRs.
+3. Maybe I should make a multi-k approach... or a double-k approach, for 1D and 2D reads... not sure...
+
+LoRDEc was already used in transcriptomic data:
+  http://www.atgc-montpellier.fr/lordec/acor-sm.pdf
+  sec 3
+
+4. It is hard to find Alternative paths when the long reads is uncorrected and may be composed by weak kmers...
+  -Maybe it is nice to correct the long read in such a way that it is composed by strong kmers
+    -use LorDEC
+
+
+Alg:
+For each strong kmer i:
+  Explore i in such a way that adding the next neighbor k, k not in the long read, will still allow you to get to a j>i node
+    -use the binary partition method
+    note: j must be the lowest node reachable from k, but still j>i
+    -use branch/path length to limit the search?
+
+
+Pipeline
+??? - use a single k?
+1. Build the DBG with KS (using GATB)
+2. Correct the long reads using Lordec (here it would be nice to have also the sequencing errors removed due to -C, but this can be postponed)
+  -The nice thing is that we will use a single graph to find the events and the correction
+  -this means that we are not only doing a correction, but we are correcting the long reads with the strong kmers, which makes the next step easier
+3. Apply the algorithm to find alternative paths only in NGS
+
+
+For the spliced alignment alg, use the ULG idea?
+  -for a DNA read to cover the region, we need the read to cover both flanking exons. And then, we choose the trustful unitigs, and check if they are in the long read. Find a path that goes through the trustful unitigs that are on the long reads and that aligns splicedly to the long read.
+    -there should be few trustful unitigs that aligns well splicidly to the graph... therefore, you can do it in a cDBG... you do not need a hash - few unitigs = fast...

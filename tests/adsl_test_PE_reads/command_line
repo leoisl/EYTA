@@ -1,0 +1,28 @@
+#PROBLEM:
+MCF7 PE READS ARE NOT THAT NICE TO USE TO SOLVE REPEATS... THE FRAGMENT IS PRETTY SHORT, THE READS OVERLAP TOO MUCH.
+@SEE MCF7_PE_READS.png
+
+#getting all PE-reads mapping to the ADSL gene:
+/pandata/benoit/MCF7_sipp/trimmed_data/siCTL_R1$ samtools view accepted_hits_F260_f1_q10_manual.bam -F 12 "22:40,742,504-40,762,575" > /pandata/ishi/mcf7/PE_reads_on_ADSL.sam
+/pandata/benoit/MCF7_sipp/trimmed_data/siCTL_R1$ samtools view -H accepted_hits_F260_f1_q10_manual.bam > /pandata/ishi/mcf7/header
+/pandata/ishi/mcf7$ cat header PE_reads_on_ADSL.sam > PE_reads_on_ADSL.with_header.sam
+samtools view -bS PE_reads_on_ADSL.with_header.sam > PE_reads_on_ADSL.with_header.bam
+samtools index PE_reads_on_ADSL.with_header.bam
+#now we can view PE_reads_on_ADSL.with_header.bam on IGV to be sure
+
+#putting the left reads of left_reads.fa and the right reads on right_reads.Fa
+samtools view PE_reads_on_ADSL.with_header.bam -f 64 > left_reads_on_ADSL.sam
+cat header left_reads_on_ADSL.sam > left_reads_on_ADSL.with_header.sam
+samtools view -bS left_reads_on_ADSL.with_header.sam > left_reads_on_ADSL.with_header.bam
+samtools index left_reads_on_ADSL.with_header.bam
+#now we can view left_reads_on_ADSL.with_header.bam on IGV to be sure
+
+#and now generate both reads file
+python produce_left_right_read_files.py left_reads_ids /pandata/benoit/MCF7_sipp/trimmed_data/fastq/siCTL_N1_GGCTAC_R1_trim_right_cutadapt_match_trim_to_100_match.fastq.gz /pandata/benoit/MCF7_sipp/trimmed_data/fastq/siCTL_N1_GGCTAC_R2_trim_right_cutadapt_match_trim_to_100_match.fastq.gz
+
+
+
+#for testing as SE reads:
+tools/EYTA -t ../tests/adsl_test_PE_reads/tfile -sesr ../tests/adsl_test_PE_reads/srfiles -nb-cores 1
+#for testing as PE reads:
+tools/EYTA -t ../tests/adsl_test_PE_reads/tfile -pesr ../tests/adsl_test_PE_reads/srfiles -nb-cores 1

@@ -1,0 +1,162 @@
+#RUNNING ASTALAVISTA:
+#1/ download Homo_sapiens.GRCh38.90.gtf:
+curl -O ftp://ftp.ensembl.org/pub/release-90/gtf/homo_sapiens/Homo_sapiens.GRCh38.90.gtf.gz
+#2/ extract:
+gunzip Homo_sapiens.GRCh38.90.gtf.gz
+
+#2.5 (optional)
+#we will do this just to work on the annotations from chr1, but you can skip this and you will work on the whole annotation
+awk '$1==1' Homo_sapiens.GRCh38.90.gtf > Homo_sapiens.GRCh38.90.chr1.gtf
+rm Homo_sapiens.GRCh38.90.gtf
+mv Homo_sapiens.GRCh38.90.chr1.gtf Homo_sapiens.GRCh38.90.gtf
+
+#3/ paralog genes cause trouble for us to analyse the performance of the tool because they share k-mers
+#Let's remove paralog genes (warning: this restrict us to 6600 / 63967 Genes). To do so, go to:
+http://aug2017.archive.ensembl.org/biomart/martview/
+Database: Ensembl Genes 90
+Dataset: Human genes
+
+Filters:
+	Gene:
+		Transcript count >= 2
+		Gene type: protein_coding
+	MULTI SPECIES COMPARISONS:
+		Homologue filters -> Paralogous Human Genes -> Excluded
+
+Attributes:
+	Features:
+		Gene stable ID
+
+Click on Results and download the file format TSV and check Unique results only
+    Name it Homo_sapiens.GRCh38.90.non_paralogous_genes.txt
+
+
+#4/ keeping only the non_paralogous_genes in the gtf
+#PS: after this, we get only 4782 genes (whole transcriptome) or 488 genes (chr1 only)
+python keep_only_non_paralogous_genes.py > Homo_sapiens.GRCh38.90.gtf.non_paralogous_genes_only
+rm Homo_sapiens.GRCh38.90.gtf
+mv Homo_sapiens.GRCh38.90.gtf.non_paralogous_genes_only Homo_sapiens.GRCh38.90.gtf
+
+#5/ removing overlapping genes (THIS IS NOT COMPLETE - NOT NEEDED)
+#python remove_overlapping_genes.py
+
+
+
+#5/ Splitting the gtf into several gtfs, one per gene, otherwise ASTALAVISTA does not work well...
+python divide_gtf_by_gene_id.py
+
+
+
+#6/ running ASTALAVISTA in each GTF
+bash run_ASTALAVISTA.sh
+
+
+
+#7/ combining all ASTALAVISTA runs into one file:
+zcat Homo_sapiens.GRCh38.90.gtf_divided_by_gene_id/*.gz > Homo_sapiens.GRCh38.90.gtf_astalavista.gtf
+
+
+
+#8/ generating the fasta files of the events in Homo_sapiens.GRCh38.90.gtf_astalavista.gtf
+python /data2/leandro/EYTA/git/EYTA/scripts/astalavista_scripts/convert_astalavista_gtf_to_fasta.py --genome /data2/leandro/EYTA/ASTALAVISTA/ASTALAVISTA_run_on_GRCh38.p10_Ensembl90/GRCh38/ --gtf Homo_sapiens.GRCh38.90.gtf --astalavista Homo_sapiens.GRCh38.90.gtf_astalavista.gtf --output Homo_sapiens.GRCh38.90.gtf_astalavista.gtf.all_pairwise_events.fa -k 61
+#output for logging (chr1):
+# of errors logged:
+exonErrors =  0
+flankingExonsDoNotCorrespond =  342
+flankingExonsTooShort =  2819
+FlankingExonDoNotExist =  233
+successful =  4897
+
+
+
+
+
+
+
+
+#GENERATING EYTA INPUT
+#1/ generating transcript sequences from the gtf and the genome
+/data2/leandro/RNA-long-reads-Simulator/extractSequencesFromGTF/gffread/gffread -g /data2/leandro/EYTA/ASTALAVISTA/ASTALAVISTA_run_on_GRCh38.p10_Ensembl90/GRCh38 -w Homo_sapiens.GRCh38.90.gtf.fa Homo_sapiens.GRCh38.90.gtf
+
+
+
+#2/ simulating reads from all the transcriptome
+#we are setting -d 0 so we have SE-reads
+#we are setting a seed (-S) so we can simulate exacly these reads later (change it if you want to simulate different reads)
+
+#FOR ALL TRANSCRIPTOME:
+[wgsim] seed = 12345
+[wgsim_core] calculating the total length of the reference sequence...
+[wgsim_core] 40307 sequences, total length: 58977522
+[wgsim_core] skip sequence 'ENST00000496938' as it is shorter than 150!
+[wgsim_core] skip sequence 'ENST00000461282' as it is shorter than 150!
+[wgsim_core] skip sequence 'ENST00000490787' as it is shorter than 150!
+[wgsim_core] skip sequence 'ENST00000527105' as it is shorter than 150!
+... several more skips
+#[wgsim_core] 40307 sequences, total length: 58977522, so 30x would be: 58977522*30/150 = 11795504 reads
+wgsim -e 0 -d 0 -N 11795504 -1 150 -r 0 -R 0 -X 0 -S 12345 -A 0 Homo_sapiens.GRCh38.90.gtf.fa Homo_sapiens.GRCh38.90.gtf.cov_30x.short_reads.fastq /dev/null
+
+
+
+#FOR CHR1:
+[wgsim] seed = 12345
+[wgsim_core] calculating the total length of the reference sequence...
+[wgsim_core] 3537 sequences, total length: 5457612
+[wgsim_core] skip sequence 'ENST00000496938' as it is shorter than 150!
+[wgsim_core] skip sequence 'ENST00000461282' as it is shorter than 150!
+#[wgsim_core] 3537 sequences, total length: 5457612, so 30x would be: 5457612*30/150 = 1091522 reads
+wgsim -e 0 -d 0 -N 1091522 -1 150 -r 0 -R 0 -X 0 -S 12345 -A 0 Homo_sapiens.GRCh38.90.gtf.fa Homo_sapiens.GRCh38.90.gtf.cov_30x.short_reads.fastq /dev/null
+
+
+#3/ simulating shallow transcriptome
+python generate_shallow_transcriptome.py --gtf Homo_sapiens.GRCh38.90.gtf --gtfFasta Homo_sapiens.GRCh38.90.gtf.fa --proportion 0.1 --min_length_transcript 150 --output Homo_sapiens.GRCh38.90.gtf.shallow_transcriptome_0.1.fa
+
+
+
+
+
+
+
+
+#RUNNING EYTA
+#1/ compile and go to build
+#2/ create a file sr containing the path to Homo_sapiens.GRCh38.90.gtf.cov_30x.short_reads.fastq
+#3/ run EYTA
+tools/EYTA -k 61 -t ../scripts/astalavista_scripts/Homo_sapiens.GRCh38.90.gtf.shallow_transcriptome_0.1.fa -sesr sr -min_abundance 0 -rel_cutoff 0 -max_length_intron 1000000 -max_length_as 1000000 -splicing_complexity_AS 1000000 -splicing_complexity_IR 1000000 -min_edit_distance 0 -nb-cores 1 > out 2> error
+
+cp graph.EYTA.alternative_paths.bubbles.detailed.alternative_splicing ../scripts/astalavista_scripts/
+cd ../scripts/astalavista_scripts/
+
+
+
+
+
+
+#CHECKING EYTA PERFORMANCE
+python check_EYTA_performance.py --short_reads Homo_sapiens.GRCh38.90.gtf.cov_30x.short_reads.fastq --shallow_tr Homo_sapiens.GRCh38.90.gtf.shallow_transcriptome_0.1.fa --ASTALAVISTA_AS_bubbles Homo_sapiens.GRCh38.90.gtf_astalavista.gtf.all_pairwise_events.fa --EYTA_AS_bubbles graph.EYTA.alternative_paths.bubbles.detailed.alternative_splicing --transcriptomeFasta Homo_sapiens.GRCh38.90.gtf.fa --transcriptomeGTF Homo_sapiens.GRCh38.90.gtf > EYTA_performance
+
+
+
+
+
+
+
+
+
+#SUPPLEMENTARY
+#SUPPLEMENTARY
+#SUPPLEMENTARY
+
+#MAPPING READS TO THE REF GENOME OF CHR 1 WITH ALL THE MODIFS WE HAVE DONE:
+#Homo_sapiens.GRCh38.90.gtf IS OBTAINED AFTER STEP 4 OF RUNNING ASTALAVISTA
+/data2/leandro/repeats_on_transcriptome/STAR_2.5.3a/STAR-2.5.3a/bin/Linux_x86_64_static/STAR --runMode genomeGenerate --runThreadN 8 --genomeDir Star_index_chr1/ --genomeFastaFiles reference/genome/1.fa --sjdbGTFfile Homo_sapiens.GRCh38.90.gtf --sjdbOverhang 100
+
+#MAPPING EVERYTHING
+bash map_files_for_debug.sh
+
+
+
+
+
+
+
